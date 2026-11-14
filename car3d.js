@@ -78,11 +78,15 @@ function wrapTexture(img) {
 export async function show(container, id, wrap) {
   stage ??= setup(container);
   const ticket = ++latest;
+  const { scene, camera, controls } = stage;
+  if (stage.id !== id && stage.car) {
+    scene.remove(stage.car.scene);
+    stage.car = null;
+  }
+  stage.id = id;
   const car = await loadCar(id);
   if (ticket !== latest) return;
-  const { scene, camera, controls } = stage;
   if (stage.car !== car) {
-    if (stage.car) scene.remove(stage.car.scene);
     scene.add(car.scene);
     stage.car = car;
     const box = new THREE.Box3().setFromObject(car.scene);
