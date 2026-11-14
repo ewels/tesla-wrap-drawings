@@ -50,4 +50,8 @@ Test: `node test/align.test.mjs`
 
 Deploy: enable GitHub Pages from the `main` branch root.
 
+## Licence
+
+The code is [MIT](LICENSE). The car models in `cars/` and the wrap templates belong to Tesla and are not covered by that licence.
+
 Not affiliated with Tesla.
