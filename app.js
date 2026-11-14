@@ -9,11 +9,18 @@ const store = {
   set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
 };
 
-for (const select of [modelSelect, printSelect])
-  select.innerHTML = MODELS.map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+const options = (ids) => ids.map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+function fillModels(detected) {
+  const rest = MODELS.filter(([id]) => id !== detected);
+  modelSelect.innerHTML = detected
+    ? `<optgroup label="Detected">${options(MODELS.filter(([id]) => id === detected))}</optgroup><optgroup label="Other cars">${options(rest)}</optgroup>`
+    : options(MODELS);
+}
+fillModels();
+printSelect.innerHTML = options(MODELS);
 printSelect.value = store.get('model') || 'modely';
 
-let worker, result, downloadUrl;
+let worker, result, downloadUrl, detectedId, forcing = false;
 
 function startWorker() {
   worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
@@ -32,6 +39,7 @@ function setState(state) {
 }
 
 function fail(message) {
+  forcing = false;
   setState('empty');
   $('controls').hidden = false;
   $('intro').hidden = false;
@@ -77,22 +85,25 @@ async function handle(file) {
   worker.postMessage({ bitmap, prefer: store.get('model') || 'modely' }, [bitmap]);
 }
 
-function outlineCanvas(tpl) {
+function checkOverlay(tpl) {
   const c = document.createElement('canvas');
   c.width = tpl.width; c.height = tpl.height;
   const img = new ImageData(tpl.width, tpl.height);
   for (let i = 0; i < tpl.width * tpl.height; i++)
     if (isTemplateLine(tpl.data, i)) img.data.set([228, 0, 124, 255], i * 4);
+    else if (tpl.data[i * 4 + 3] < 128) img.data[i * 4 + 3] = 51;
   c.getContext('2d').putImageData(img, 0, 0);
   return c;
 }
 
 async function show(data) {
-  result = { ...data, wrap: toImageData(data.wrap), aligned: toImageData(data.aligned), outline: outlineCanvas(data.tpl) };
+  result = { ...data, wrap: toImageData(data.wrap), aligned: toImageData(data.aligned), outline: checkOverlay(data.tpl) };
   store.set('model', data.id);
+  if (!forcing) fillModels(detectedId = data.id);
+  forcing = false;
   modelSelect.value = data.id;
   printSelect.value = data.id;
-  $('detected').hidden = false;
+  $('detected').hidden = data.id !== detectedId;
   sheet.style.setProperty('--ar', data.tpl.width / data.tpl.height);
   view.width = data.tpl.width; view.height = data.tpl.height;
   if (!$('name').dataset.touched) $('name').value = `${label(data.id).replace(/\s*\(.*\)/, '')} wrap`.slice(0, 26);
@@ -124,7 +135,7 @@ function draw() {
   ctx.clearRect(0, 0, view.width, view.height);
   ctx.putImageData(check ? result.aligned : result.wrap, 0, 0);
   if (check) ctx.drawImage(result.outline, 0, 0);
-  view.setAttribute('aria-label', check ? 'Photo with the template outline drawn over it in pink' : 'Finished wrap');
+  view.setAttribute('aria-label', check ? 'Photo with the template outline drawn over it in pink and the parts left off the car shaded' : 'Finished wrap');
 }
 
 // Canvas PNGs of crayon texture can blow past Tesla's limit, so step down:
@@ -169,6 +180,7 @@ modelSelect.addEventListener('change', () => {
   for (const el of $('controls').children) el.hidden = el.id === 'notice' || el.id === 'share';
   notice('');
   setState('busy');
+  forcing = true;
   worker.postMessage({ force: modelSelect.value });
 });
 
@@ -262,3 +274,26 @@ $('print-button').addEventListener('click', () => {
   if (img.complete && img.naturalWidth) print(); else img.onload = () => print();
 });
 refreshSheet();
+
+navigator.serviceWorker?.register('sw.js').catch(() => {});
+
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if (!standalone && (ios || matchMedia('(pointer: coarse)').matches) && !store.get('install-dismissed')) {
+  let prompt;
+  addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    prompt = e;
+    $('install-button').hidden = false;
+    $('install').hidden = false;
+  });
+  if (ios) {
+    $('install-text').innerHTML = 'Use it like an app: tap <b>Share</b>, then <b>Add to Home Screen</b>.';
+    $('install').hidden = false;
+  }
+  $('install-button').addEventListener('click', async () => {
+    prompt.prompt();
+    if ((await prompt.userChoice).outcome === 'accepted') $('install').hidden = true;
+  });
+  $('install-close').addEventListener('click', () => { $('install').hidden = true; store.set('install-dismissed', '1'); });
+}

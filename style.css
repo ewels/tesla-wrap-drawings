@@ -286,3 +286,9 @@ select:focus-visible, input[type='text']:focus-visible { outline: 2px solid var(
   #printable { display: flex; align-items: center; justify-content: center; height: 100vh; }
   #printable img { max-width: 100%; max-height: 100%; }
 }
+
+.install { display: flex; align-items: center; gap: 0.75rem; padding: 0.7rem 16px; background: var(--sheet); border-bottom: 1px solid var(--rule); font-size: 0.9rem; }
+.install p { flex: 1; margin: 0; }
+.install .button { padding-block: 0.45rem; }
+.install-close { border: 0; background: none; font: inherit; font-size: 1.5rem; line-height: 1; padding: 0.25rem 0.4rem; color: inherit; cursor: pointer; }
+@media print { .install { display: none !important; } }
