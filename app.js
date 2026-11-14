@@ -330,15 +330,11 @@ if (!standalone && (ios || matchMedia('(pointer: coarse)').matches) && !store.ge
     $('install').hidden = false;
   });
   if (ios) {
-    $('install-text').innerHTML = 'Tap Share, then <b>Add to Home Screen</b>.';
-    if (navigator.share) {
-      $('install-button').textContent = 'Share';
-      $('install-button').hidden = false;
-    }
+    // A web page's share sheet never offers Add to Home Screen; only Safari's own Share button does.
+    $('install-text').innerHTML = `In Safari, tap <b>Share</b> <svg class="share-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5v10M6.5 6 10 2.5 13.5 6M6 9H4.5v8.5h11V9H14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg> (under <b>•••</b> on newer iPhones), then <b>Add to Home Screen</b>.`;
     $('install').hidden = false;
   }
   $('install-button').addEventListener('click', async () => {
-    if (!prompt) return navigator.share({ title: 'Crayon to Car', url: location.href }).catch(() => {});
     prompt.prompt();
     if ((await prompt.userChoice).outcome === 'accepted') $('install').hidden = true;
   });

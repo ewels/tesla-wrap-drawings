@@ -312,6 +312,7 @@ select:focus-visible, input[type='text']:focus-visible { outline: 2px solid var(
 .install-copy { flex: 1; min-width: 0; }
 .install-title { font-weight: 750; font-stretch: 110%; font-size: 1rem; }
 .install #install-text { color: #cfccd6; }
+.share-icon { width: 1.15em; height: 1.15em; vertical-align: -0.2em; color: var(--sheet); }
 .install .button { min-height: 40px; padding: 0.45rem 0.9rem; background: var(--sheet); color: var(--ink); border-color: var(--sheet); }
 .install-close { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; color: #cfccd6; cursor: pointer; }
 .install-close svg { width: 18px; height: 18px; }
