@@ -130,12 +130,19 @@ const toImageData = ({ width, height, data }) => new ImageData(new Uint8ClampedA
 
 function draw() {
   const ctx = view.getContext('2d');
-  const check = document.querySelector('input[name=view]:checked').value === 'check';
-  sheet.dataset.view = check ? 'check' : 'wrap';
+  const mode = document.querySelector('input[name=view]:checked').value;
+  const check = mode === 'check';
+  sheet.dataset.view = mode;
   ctx.clearRect(0, 0, view.width, view.height);
   ctx.putImageData(check ? result.aligned : result.wrap, 0, 0);
   if (check) ctx.drawImage(result.outline, 0, 0);
   view.setAttribute('aria-label', check ? 'Photo with the template outline drawn over it in pink and the parts left off the car shaded' : 'Finished wrap');
+  $('view3d').hidden = mode !== '3d';
+  if (mode === '3d')
+    import('./car3d.js').then((m) => m.show($('view3d'), result.id, result.wrap)).catch(() => {
+      notice('The 3D car couldn’t be loaded. Check your connection and try again.');
+      document.querySelector('input[name=view][value=wrap]').click();
+    });
 }
 
 // Canvas PNGs of crayon texture can blow past Tesla's limit, so step down:

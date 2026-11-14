@@ -11,6 +11,7 @@
   <meta name="theme-color" content="#17161b">
   <link rel="preload" href="fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
+  <script type="importmap">{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"}}</script>
   <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -66,6 +67,7 @@
 
           <figure class="result">
             <canvas id="view" width="1024" height="1024" role="img" aria-label="Finished wrap"></canvas>
+            <div id="view3d" class="view3d" role="img" aria-label="The wrap on a 3D model of the car. Drag to turn it." hidden></div>
           </figure>
         </div>
         <p class="slug" id="slug"><span>Crayon to Car</span><span>Hatched areas never show on the car</span></p>
@@ -83,6 +85,7 @@
             <div class="segmented">
               <label><input type="radio" name="view" value="wrap" checked><span>Wrap</span></label>
               <label><input type="radio" name="view" value="check"><span>Check alignment</span></label>
+              <label><input type="radio" name="view" value="3d"><span>3D</span></label>
             </div>
           </fieldset>
 
@@ -154,7 +157,7 @@
   </main>
 
   <footer class="footer">
-    <p>Templates come from <a href="https://github.com/teslamotors/custom-wraps">teslamotors/custom-wraps</a>. Not affiliated with Tesla.</p>
+    <p>Templates come from <a href="https://github.com/teslamotors/custom-wraps">teslamotors/custom-wraps</a>; 3D cars are from Tesla’s app, via <a href="https://www.tesla-wrap.com/">tesla-wrap.com</a>. Not affiliated with Tesla.</p>
     <p><a href="https://github.com/ewels/tesla-wrap-drawings">Source on GitHub</a></p>
   </footer>
 

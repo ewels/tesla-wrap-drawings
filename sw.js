@@ -1,5 +1,5 @@
 const CACHE = 'crayon-to-car';
-const SHELL = ['./', 'style.css', 'app.js', 'worker.js', 'align.js', 'models.js', 'fonts/archivo.woff2', 'icon-192.png'];
+const SHELL = ['./', 'car3d.js', 'style.css', 'app.js', 'worker.js', 'align.js', 'models.js', 'fonts/archivo.woff2', 'icon-192.png'];
 
 addEventListener('install', (e) => e.waitUntil(caches.open(CACHE).then((c) =>
   c.addAll(SHELL.map((url) => new Request(url, { cache: 'reload' }))))));

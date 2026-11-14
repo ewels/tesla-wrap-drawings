@@ -17,6 +17,10 @@ Everything runs in the browser. Photos never leave the device.
 
 The official templates load live from [teslamotors/custom-wraps](https://github.com/teslamotors/custom-wraps). To add a model, add a line to `models.js`.
 
+## 3D preview
+
+The car models in `cars/` are Tesla's in-app visualiser models, converted to Draco-compressed glTF by [tesla-wrap.com](https://www.tesla-wrap.com/). They remain Tesla's property. The wrap is painted onto the material flagged `wrap` in each model, using its second UV set, which matches the template layout. They're shown with [three.js](https://threejs.org/), loaded from jsDelivr only when the 3D view is opened.
+
 ## Develop
 
 Static files with no build step. Serve the folder (`python3 -m http.server`) and open it. HEIC photos decode natively in Safari; other browsers load [heic-to](https://github.com/hoppergee/heic-to) from jsDelivr on demand.
