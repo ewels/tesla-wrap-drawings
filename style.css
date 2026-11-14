@@ -203,7 +203,7 @@ select { appearance: none; padding-right: 2.2rem; background: var(--sheet) url("
 select:hover, input[type='text']:hover { border-color: var(--ink-2); }
 select:focus-visible, input[type='text']:focus-visible { outline: 2px solid var(--magenta); outline-offset: 0; border-color: var(--magenta); }
 
-.segmented { display: grid; grid-template-columns: 1fr 1.7fr 0.8fr; background: var(--stock-deep); border-radius: 5px; padding: 3px; }
+.segmented { display: grid; grid-template-columns: 1fr 1fr; background: var(--stock-deep); border-radius: 5px; padding: 3px; }
 .segmented label { position: relative; }
 .segmented input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
 .segmented span { display: block; text-align: center; padding: 0.5rem 0.4rem; border-radius: 3px; font-size: 0.9rem; font-weight: 550; color: var(--ink-2); transition: background 150ms, color 150ms; }
@@ -224,6 +224,9 @@ select:focus-visible, input[type='text']:focus-visible { outline: 2px solid var(
 .button:hover { background: var(--stock-deep); }
 .button:active { transform: translateY(1px); }
 .button.primary { background: var(--ink); color: var(--sheet); }
+.button.wide { flex-basis: 100%; }
+.button svg { width: 20px; height: 20px; flex: none; }
+.button[aria-pressed='true'] { background: var(--stock-deep); }
 .button.primary:hover { background: #000; box-shadow: 0 0 0 0 transparent, inset 0 -3px 0 var(--magenta); }
 .button.quiet { border-color: transparent; background: transparent; text-decoration: underline; text-decoration-color: var(--rule); padding-inline: 0.5rem; }
 .button.quiet:hover { text-decoration-color: var(--magenta); background: transparent; }

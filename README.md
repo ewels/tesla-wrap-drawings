@@ -1,12 +1,33 @@
-# Crayon to Car
+<h1 align="center">
+  <a href="https://ewels.github.io/tesla-wrap-drawings/"><img src="docs/banner.png" alt="Crayon to Car: photograph a coloured-in Tesla wrap template and get a PNG your car's Paint Shop accepts"></a>
+</h1>
 
-Turn a coloured-in Tesla wrap template into a PNG for the car's Paint Shop.
+<p align="center"><b><a href="https://ewels.github.io/tesla-wrap-drawings/">ewels.github.io/tesla-wrap-drawings</a></b></p>
+
+Kids colour in a printed Tesla wrap template. You take a photo. Crayon to Car finds the template in the photo, lines it up, cuts out the parts that show on the car and saves a PNG for the car's Paint Shop.
 
 1. Print a colouring sheet from the site (or Tesla's own template) and colour it in.
 2. Photograph it and drop the photo on the page.
-3. The template is found in the photo, lined up, cut out, and saved as a PNG that meets Tesla's limits (≤1024 px, under 1 MB).
+3. Download the PNG, check it on a 3D model of the car, and send it to the car.
 
 Everything runs in the browser. Photos never leave the device.
+
+<p align="center"><img src="docs/app.png" alt="The app: a hatched drop area for the photo, with a how-it-works list beside it" width="800"></p>
+
+## Features
+
+- **Automatic alignment.** Works out which car the drawing is for, and copes with rotated, tilted and shadowed photos.
+- **Tesla-ready PNG.** Keeps the template's transparency exactly, removes the printed outlines and stays under Tesla's 1 MB limit.
+- **3D preview.** See the drawing on the car before you send it.
+- **Better colouring sheets.** The glass roof and other parts that never show on the car are hatched out, so nobody spends ages colouring them.
+- **Installs on your phone.** Add it to the home screen and it works like an app, offline too.
+
+<table>
+  <tr>
+    <td width="66%"><img src="docs/print-sheet.png" alt="Print a colouring sheet: the Model Y template with the parts that don't show on the car hatched in light blue"></td>
+    <td width="34%"><img src="docs/phone.png" alt="The app on a phone, with a banner offering to add it to the home screen"></td>
+  </tr>
+</table>
 
 ## How the alignment works
 

@@ -130,7 +130,7 @@ const toImageData = ({ width, height, data }) => new ImageData(new Uint8ClampedA
 
 function draw() {
   const ctx = view.getContext('2d');
-  const mode = document.querySelector('input[name=view]:checked').value;
+  const mode = $('show3d').ariaPressed === 'true' ? '3d' : document.querySelector('input[name=view]:checked').value;
   const check = mode === 'check';
   sheet.dataset.view = mode;
   ctx.clearRect(0, 0, view.width, view.height);
@@ -141,7 +141,7 @@ function draw() {
   if (mode === '3d')
     import('./car3d.js').then((m) => m.show($('view3d'), result.id, result.wrap)).catch(() => {
       notice('The 3D car couldn’t be loaded. Check your connection and try again.');
-      document.querySelector('input[name=view][value=wrap]').click();
+      set3d(false);
     });
 }
 
@@ -181,7 +181,13 @@ $('file').addEventListener('change', (e) => { handle(e.target.files[0]); e.targe
 $('name').addEventListener('input', (e) => { e.target.dataset.touched = '1'; updateName(); });
 $('restart').addEventListener('click', () => { setState('empty'); notice(''); $('file').click(); });
 $('share').addEventListener('click', () => navigator.share({ files: [new File([result.blob.blob], fileName(), { type: 'image/png' })] }).catch(() => {}));
-document.querySelectorAll('input[name=view]').forEach((r) => r.addEventListener('change', draw));
+function set3d(on) {
+  $('show3d').ariaPressed = String(on);
+  $('show3d').lastChild.textContent = on ? 'Back to the flat wrap' : 'See it on the car in 3D';
+  draw();
+}
+$('show3d').addEventListener('click', () => set3d($('show3d').ariaPressed !== 'true'));
+document.querySelectorAll('input[name=view]').forEach((r) => r.addEventListener('click', () => set3d(false)));
 modelSelect.addEventListener('change', () => {
   store.set('model', modelSelect.value);
   for (const el of $('controls').children) el.hidden = el.id === 'notice' || el.id === 'share';
