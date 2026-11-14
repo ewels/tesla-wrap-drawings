@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crayon to Car</title>
+  <meta name="description" content="Turn a coloured-in Tesla wrap template into a PNG for your car's Paint Shop. Runs in your browser; photos never leave your device.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke='%2316161a' stroke-width='2.5'%3E%3Ccircle cx='16' cy='16' r='9'/%3E%3Cpath d='M16 1v30M1 16h30'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="preload" href="fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="target" viewBox="-20 -20 40 40">
+      <circle r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+      <path d="M0-19V19M-19 0H19" stroke="currentColor" stroke-width="2"/>
+      <circle r="3.2" fill="currentColor"/>
+    </symbol>
+  </svg>
+
+  <header class="masthead">
+    <a class="wordmark" href="./">
+      <span class="reg" aria-hidden="true"><svg class="c"><use href="#target"/></svg><svg class="m"><use href="#target"/></svg><svg class="y"><use href="#target"/></svg></span>
+      Crayon to Car
+    </a>
+    <nav aria-label="Sections">
+      <a href="#make">Make a wrap</a>
+      <a href="#print">Print a sheet</a>
+      <a href="#send">Send to the car</a>
+    </nav>
+  </header>
+  <div class="colour-bar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+  <main>
+    <section id="make" class="workbench" aria-labelledby="make-title">
+      <div class="stage">
+        <div class="sheet" id="sheet" data-state="empty">
+          <span class="crop tl"></span><span class="crop tr"></span><span class="crop bl"></span><span class="crop br"></span>
+          <span class="reg side t" aria-hidden="true"><svg class="c"><use href="#target"/></svg><svg class="m"><use href="#target"/></svg><svg class="y"><use href="#target"/></svg></span>
+          <span class="reg side r" aria-hidden="true"><svg class="c"><use href="#target"/></svg><svg class="m"><use href="#target"/></svg><svg class="y"><use href="#target"/></svg></span>
+          <span class="reg side b" aria-hidden="true"><svg class="c"><use href="#target"/></svg><svg class="m"><use href="#target"/></svg><svg class="y"><use href="#target"/></svg></span>
+          <span class="reg side l" aria-hidden="true"><svg class="c"><use href="#target"/></svg><svg class="m"><use href="#target"/></svg><svg class="y"><use href="#target"/></svg></span>
+
+          <label class="drop" for="file">
+            <svg class="drop-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M8 14h7l3-5h12l3 5h7v24H8z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><circle cx="24" cy="26" r="7" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>
+            <h1 id="make-title">Drop a photo of the finished drawing</h1>
+            <p>Lay the sheet flat in good light and get the whole page in the frame. JPEG, HEIC or PNG.</p>
+            <span class="button primary">Choose photo</span>
+            <input id="file" type="file" accept="image/*,.heic,.heif">
+          </label>
+
+          <div class="busy" role="status" aria-live="polite">
+            <img id="busy-photo" alt="">
+            <p id="busy-text">Reading the photo</p>
+          </div>
+
+          <figure class="result">
+            <canvas id="view" width="1024" height="1024" role="img" aria-label="Finished wrap"></canvas>
+          </figure>
+        </div>
+        <p class="slug" id="slug"><span>Crayon to Car</span><span>Hatched areas never show on the car</span></p>
+      </div>
+
+      <aside class="panel" aria-label="Wrap settings">
+        <div class="panel-block" id="controls" hidden>
+          <label class="field">
+            <span class="field-label">Car <span class="badge" id="detected" hidden>Detected</span></span>
+            <select id="model"></select>
+          </label>
+
+          <fieldset class="field">
+            <legend class="field-label">Show</legend>
+            <div class="segmented">
+              <label><input type="radio" name="view" value="wrap" checked><span>Wrap</span></label>
+              <label><input type="radio" name="view" value="check"><span>Check alignment</span></label>
+            </div>
+          </fieldset>
+
+          <p class="notice" id="notice" hidden></p>
+
+          <label class="field">
+            <span class="field-label">Name</span>
+            <input id="name" type="text" maxlength="26" autocomplete="off" spellcheck="false">
+            <span class="hint">Shows in the car's Paint Shop. Letters, numbers, spaces, - and _.</span>
+          </label>
+
+          <div class="actions">
+            <a class="button primary" id="download" download>Download PNG</a>
+            <button class="button" id="share" type="button" hidden>Share</button>
+            <button class="button quiet" id="restart" type="button">Start again</button>
+          </div>
+          <p class="meta" id="meta"></p>
+        </div>
+
+        <div class="panel-block" id="intro">
+          <h2>How it works</h2>
+          <ol class="steps">
+            <li><strong>Print</strong> a sheet for your car below, or Tesla's own template.</li>
+            <li><strong>Colour it in.</strong> Crayons, pens, paint: anything goes.</li>
+            <li><strong>Photograph it</strong> and drop the photo here. The outline is found and lined up for you.</li>
+            <li><strong>Download</strong> the PNG and send it to the car.</li>
+          </ol>
+          <p class="meta">Everything happens in your browser. Photos never leave your device.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section id="print" class="print-section" aria-labelledby="print-title">
+      <div class="print-copy">
+        <h2 id="print-title">Print a colouring sheet</h2>
+        <p>Tesla's template prints the glass roof and gaps as blank paper, so they get coloured in and then thrown away. These sheets hatch them out in light blue, and add registration marks that make the photo line up even more reliably.</p>
+        <label class="field">
+          <span class="field-label">Car</span>
+          <select id="print-model"></select>
+        </label>
+        <div class="actions">
+          <button class="button primary" id="print-button" type="button">Print sheet</button>
+          <a class="button" id="sheet-download" download>Download sheet</a>
+        </div>
+        <p class="meta">Prints best on A4 or Letter, portrait, with "fit to page" on.</p>
+      </div>
+      <div class="print-preview">
+        <img id="print-img" alt="Colouring sheet preview">
+      </div>
+    </section>
+
+    <section id="send" class="send" aria-labelledby="send-title">
+      <h2 id="send-title">Send it to the car</h2>
+      <div class="send-grid">
+        <div>
+          <h3>From the Tesla app</h3>
+          <p>Needs app version 4.59 or later. Go to <b>Creations</b>, then <b>Wrap</b>, then <b>Upload</b>, and pick the PNG. On a phone, tap <b>Share</b> and save the image to Photos first.</p>
+        </div>
+        <div>
+          <h3>With a USB drive</h3>
+          <p>Format it as exFAT or FAT32, make a folder called <code>Wraps</code> at the top level and put the PNG inside. Up to 10 wraps at a time.</p>
+        </div>
+        <div>
+          <h3>In the car</h3>
+          <p>Open <b>Toybox</b>, then <b>Paint Shop</b>, then the <b>Wraps</b> tab.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Templates come from <a href="https://github.com/teslamotors/custom-wraps">teslamotors/custom-wraps</a>. Not affiliated with Tesla.</p>
+    <p><a href="https://github.com/ewels/tesla-wrap-drawings">Source on GitHub</a></p>
+  </footer>
+
+  <div id="printable" aria-hidden="true"><img id="printable-img" alt=""></div>
+</body>
+</html>
