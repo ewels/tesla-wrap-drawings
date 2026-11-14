@@ -96,7 +96,37 @@ function checkOverlay(tpl) {
   return c;
 }
 
+let car3d;
+const get3d = () => (car3d ??= import('./car3d.js').catch((err) => { car3d = null; throw err; }));
+const preload3d = (id) => get3d().then((m) => m.preload(id)).catch(() => {});
+
+async function load3d(id, wrap) {
+  const bar = $('load3d'), fill = bar.querySelector('span');
+  let mod, raf;
+  // Only show the bar if loading is noticeable, so cached cars don't flash it.
+  const reveal = setTimeout(() => { bar.hidden = false; }, 150);
+  const tick = () => {
+    const p = mod?.progress(id);
+    bar.classList.toggle('indeterminate', p == null);
+    fill.style.width = `${(p ?? 0) * 100}%`;
+    raf = requestAnimationFrame(tick);
+  };
+  tick();
+  try {
+    mod = await get3d();
+    await mod.show($('view3d'), id, wrap);
+  } catch {
+    notice('The 3D car couldn’t be loaded. Check your connection and try again.');
+    set3d(false);
+  } finally {
+    clearTimeout(reveal);
+    cancelAnimationFrame(raf);
+    bar.hidden = true;
+  }
+}
+
 async function show(data) {
+  preload3d(data.id);
   result = { ...data, wrap: toImageData(data.wrap), aligned: toImageData(data.aligned), outline: checkOverlay(data.tpl) };
   store.set('model', data.id);
   if (!forcing) fillModels(detectedId = data.id);
@@ -139,10 +169,8 @@ function draw() {
   view.setAttribute('aria-label', check ? 'Photo with the template outline drawn over it in pink and the parts left off the car shaded' : 'Finished wrap');
   $('view3d').hidden = mode !== '3d';
   if (mode === '3d')
-    import('./car3d.js').then((m) => m.show($('view3d'), result.id, result.wrap)).catch(() => {
-      notice('The 3D car couldn’t be loaded. Check your connection and try again.');
-      set3d(false);
-    });
+    load3d(result.id, result.wrap);
+  else $('load3d').hidden = true;
 }
 
 // Canvas PNGs of crayon texture can blow past Tesla's limit, so step down:
@@ -190,6 +218,7 @@ $('show3d').addEventListener('click', () => set3d($('show3d').ariaPressed !== 't
 document.querySelectorAll('input[name=view]').forEach((r) => r.addEventListener('click', () => set3d(false)));
 modelSelect.addEventListener('change', () => {
   store.set('model', modelSelect.value);
+  preload3d(modelSelect.value);
   for (const el of $('controls').children) el.hidden = el.id === 'notice' || el.id === 'share';
   notice('');
   setState('busy');
@@ -301,10 +330,15 @@ if (!standalone && (ios || matchMedia('(pointer: coarse)').matches) && !store.ge
     $('install').hidden = false;
   });
   if (ios) {
-    $('install-text').innerHTML = 'Use it like an app: tap <b>Share</b>, then <b>Add to Home Screen</b>.';
+    $('install-text').innerHTML = 'Tap Share, then <b>Add to Home Screen</b>.';
+    if (navigator.share) {
+      $('install-button').textContent = 'Share';
+      $('install-button').hidden = false;
+    }
     $('install').hidden = false;
   }
   $('install-button').addEventListener('click', async () => {
+    if (!prompt) return navigator.share({ title: 'Crayon to Car', url: location.href }).catch(() => {});
     prompt.prompt();
     if ((await prompt.userChoice).outcome === 'accepted') $('install').hidden = true;
   });

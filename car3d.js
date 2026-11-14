@@ -35,13 +35,28 @@ function setup(container) {
 }
 
 function loadCar(id) {
-  if (!cars.has(id)) cars.set(id, loader.loadAsync(`cars/${id}.glb`).then(({ scene }) => {
-    const paints = new Set();
-    scene.traverse((o) => { if (o.material?.userData.wrap) paints.add(o.material); });
-    return { scene, paints: [...paints] };
-  }).catch((err) => { cars.delete(id); throw err; }));
-  return cars.get(id);
+  let car = cars.get(id);
+  if (!car) {
+    car = { loaded: 0, total: 0 };
+    car.ready = loader.loadAsync(`cars/${id}.glb`, (e) => { car.loaded = e.loaded; car.total = e.total; }).then(({ scene }) => {
+      const paints = new Set();
+      scene.traverse((o) => { if (o.material?.userData.wrap) paints.add(o.material); });
+      return { scene, paints: [...paints] };
+    }).catch((err) => { cars.delete(id); throw err; });
+    cars.set(id, car);
+  }
+  return car.ready;
 }
+
+export function preload(id) { loadCar(id).catch(() => {}); }
+
+/** Download progress for a car, 0–1, or null while the size is unknown. */
+export function progress(id) {
+  const car = cars.get(id);
+  return car?.total ? Math.min(1, car.loaded / car.total) : null;
+}
+
+let latest = 0;
 
 // The car UI paints the wrap over white, so transparent (off-car) pixels never tint the body.
 function wrapTexture(img) {
@@ -62,7 +77,9 @@ function wrapTexture(img) {
 
 export async function show(container, id, wrap) {
   stage ??= setup(container);
+  const ticket = ++latest;
   const car = await loadCar(id);
+  if (ticket !== latest) return;
   const { scene, camera, controls } = stage;
   if (stage.car !== car) {
     if (stage.car) scene.remove(stage.car.scene);
