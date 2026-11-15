@@ -22,13 +22,6 @@ Everything runs in the browser. Photos never leave the device.
 - **Better colouring sheets.** A4 landscape, with the parts that never show on the car hatched out and the instructions printed alongside, so anyone can pick one up and use it. Two QR codes on each sheet tell the app which car it is and where the drawing sits, so the photo lines up first time.
 - **Installs on your phone.** Add it to the home screen and it works like an app, offline too.
 
-<table>
-  <tr>
-    <td width="66%"><img src="docs/print-sheet.png" alt="Print a colouring sheet: the Model Y template with the parts that don't show on the car hatched in light blue"></td>
-    <td width="34%"><img src="docs/phone.png" alt="The app on a phone, with a banner offering to add it to the home screen"></td>
-  </tr>
-</table>
-
 <p align="center"><img src="docs/sheet-model-y.png" alt="The Model Y colouring sheet: A4 landscape, the template on the left with off-car areas hatched in blue and a small QR code in the glass roof, and instructions with a QR code to the site on the right" width="800"><br><sub>The Model Y colouring sheet (A4 landscape)</sub></p>
 
 ## How the alignment works
