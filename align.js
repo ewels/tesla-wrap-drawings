@@ -446,6 +446,10 @@ export function renderWrap(rgb, tpl) {
           if (xx >= 0 && yy >= 0 && xx < tw && yy < th) hole[yy * tw + xx] = 1;
         }
     }
+  // Panels that run off the template edge get a closing line on printed sheets; keep it out of the wrap.
+  for (let y = 0; y < th; y++)
+    for (let x = 0; x < tw; x++)
+      if (Math.min(x, y, tw - 1 - x, th - 1 - y) < 3) hole[y * tw + x] = 1;
   inpaint(rgb, hole, tw, th, (i) => td[i * 4 + 3] > 0);
 
   const out = new Uint8ClampedArray(tw * th * 4);

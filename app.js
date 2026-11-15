@@ -318,6 +318,26 @@ async function makeSheet(id) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(lineCanvas, 0, 0, tw * s, th * s);
   ctx.scale(s, s);
+  // Some templates (Cybertruck) run panels off the image edge. Close them with
+  // a line just outside the template, where the wrap is never sampled.
+  ctx.fillStyle = '#000';
+  const t = 5;
+  // Edge pixels are anti-aliased, so look a few pixels in.
+  const on = (x, y) => [0, 1, 2, 3].some((d) => {
+    const px = x === 0 ? d : x === tw - 1 ? tw - 1 - d : x, py = y === 0 ? d : y === th - 1 ? th - 1 - d : y;
+    return tpl.data[(py * tw + px) * 4 + 3] > 128;
+  });
+  for (let x = 0; x < tw; x++) {
+    if (on(x, 0)) ctx.fillRect(x - 0.01, -t - 0.5, 1.02, t);
+    if (on(x, th - 1)) ctx.fillRect(x - 0.01, th + 0.5, 1.02, t);
+  }
+  for (let y = 0; y < th; y++) {
+    if (on(0, y)) ctx.fillRect(-t - 0.5, y - 0.01, t, 1.02);
+    if (on(tw - 1, y)) ctx.fillRect(tw + 0.5, y - 0.01, t, 1.02);
+  }
+  for (const [x, y, cx, cy] of [[0, 0, -t - 0.5, -t - 0.5], [tw - 1, 0, tw + 0.5, -t - 0.5], [tw - 1, th - 1, tw + 0.5, th + 0.5], [0, th - 1, -t - 0.5, th + 0.5]])
+    if (on(x, y)) ctx.fillRect(cx, cy, t, t);
+
   // Registration marks: alignment looks for these exact shapes.
   ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
   for (const [x, y] of markCentres(tw, th)) {
