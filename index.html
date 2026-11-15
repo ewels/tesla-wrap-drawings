@@ -103,6 +103,7 @@
               <label><input type="radio" name="view" value="wrap" checked><span>Wrap</span></label>
               <label><input type="radio" name="view" value="check"><span>Check alignment</span></label>
             </div>
+            <button class="button wide" id="show3d" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 20 7.4v9.2L12 21.2 4 16.6V7.4zM4 7.4l8 4.6 8-4.6M12 12v9.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span>See it on the car in 3D</span></button>
           </fieldset>
 
           <p class="notice" id="notice" hidden></p>
@@ -114,7 +115,6 @@
           </label>
 
           <div class="actions">
-            <button class="button wide" id="show3d" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 20 7.4v9.2L12 21.2 4 16.6V7.4zM4 7.4l8 4.6 8-4.6M12 12v9.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span>See it on the car in 3D</span></button>
             <a class="button primary" id="download" download>Download PNG</a>
             <button class="button" id="share" type="button" hidden>Share</button>
             <button class="button quiet" id="restart" type="button">Start again</button>
@@ -138,7 +138,7 @@
     <section id="print" class="print-section" aria-labelledby="print-title">
       <div class="print-copy">
         <h2 id="print-title">Print a colouring sheet</h2>
-        <p>Tesla's template prints the glass roof and gaps as blank paper, so they get coloured in and then thrown away. These sheets hatch them out in light blue, and add registration marks that make the photo line up even more reliably.</p>
+        <p>Tesla's template prints the glass roof and gaps as blank paper, so they get coloured in and then thrown away. These sheets hatch them out in light blue, and carry a small code that tells the app which car it is, so the photo lines up first time. The instructions are printed alongside, so anyone can use them.</p>
         <label class="field">
           <span class="field-label">Car</span>
           <select id="print-model"></select>
@@ -147,7 +147,7 @@
           <button class="button primary" id="print-button" type="button">Print sheet</button>
           <a class="button" id="sheet-download" download>Download sheet</a>
         </div>
-        <p class="meta">Prints best on A4 or Letter, portrait, with "fit to page" on.</p>
+        <p class="meta">Prints on A4 or Letter, landscape.</p>
       </div>
       <div class="print-preview">
         <img id="print-img" alt="Colouring sheet preview">

@@ -19,7 +19,7 @@ Everything runs in the browser. Photos never leave the device.
 - **Automatic alignment.** Works out which car the drawing is for, and copes with rotated, tilted and shadowed photos.
 - **Tesla-ready PNG.** Keeps the template's transparency exactly, removes the printed outlines and stays under Tesla's 1 MB limit.
 - **3D preview.** See the drawing on the car before you send it.
-- **Better colouring sheets.** The glass roof and other parts that never show on the car are hatched out, so nobody spends ages colouring them.
+- **Better colouring sheets.** A4 landscape, with the parts that never show on the car hatched out and the instructions printed alongside, so anyone can pick one up and use it. Two QR codes on each sheet tell the app which car it is and where the drawing sits, so the photo lines up first time.
 - **Installs on your phone.** Add it to the home screen and it works like an app, offline too.
 
 <table>

@@ -1,5 +1,5 @@
 import { MODELS, label, loadTemplate } from './models.js';
-import { isTemplateLine, markCentres, MARK_R } from './align.js';
+import { isTemplateLine, markCentres, qrSpot, sheetLayout, MM, MARK_R, QR_PREFIX } from './align.js';
 
 const $ = (id) => document.getElementById(id);
 const sheet = $('sheet'), view = $('view'), modelSelect = $('model'), printSelect = $('print-model');
@@ -18,6 +18,9 @@ function fillModels(detected) {
 }
 fillModels();
 printSelect.innerHTML = options(MODELS);
+// Sheets link here with ?car=, so a scanned sheet opens on the right car.
+const linked = new URLSearchParams(location.search).get('car');
+if (MODELS.some(([id]) => id === linked)) store.set('model', linked);
 printSelect.value = store.get('model') || 'modely';
 
 let worker, result, downloadUrl, detectedId, forcing = false;
@@ -152,7 +155,7 @@ async function show(data) {
   const file = new File([blob.blob], fileName(), { type: 'image/png' });
   $('share').hidden = !navigator.canShare?.({ files: [file] });
   const kb = Math.round(blob.blob.size / 1000), pct = Math.round(data.score * 100);
-  $('meta').textContent = `${blob.width} × ${blob.height} px · ${kb} KB${blob.posterized ? ' · colours simplified to fit 1 MB' : ''}${data.hasMarks ? ' · registration marks found' : ''}`;
+  $('meta').textContent = `${blob.width} × ${blob.height} px · ${kb} KB${blob.posterized ? ' · colours simplified to fit 1 MB' : ''}${data.fromCode ? ' · sheet code read' : ''}${data.hasMarks ? ' · registration marks found' : ''}`;
   $('slug').innerHTML = `<span>${label(data.id)}</span><span>Outline matched ${pct}%</span><span>${blob.width}×${blob.height} · ${kb} KB</span>`;
 }
 
@@ -241,36 +244,80 @@ addEventListener('paste', (e) => { const f = [...(e.clipboardData?.files || [])]
 
 // ---------- printable sheets ----------
 
+const UQR = 'https://cdn.jsdelivr.net/npm/uqr@0.1.3/dist/index.mjs';
+const SITE = 'https://ewels.github.io/tesla-wrap-drawings/';
+const C = { ink: '#17161b', ink2: '#4e4b55', rule: '#cfc8b8', npb: '#9fd6ef', cyan: '#009fe3', magenta: '#e4007c', yellow: '#ffe500' };
+
+function drawQR(ctx, encode, text, x, y, size, ecc) {
+  const { data } = encode(text, { ecc, border: 0 });
+  const n = data.length, m = size / n;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(x - 2 * m, y - 2 * m, size + 4 * m, size + 4 * m);
+  ctx.fillStyle = '#000';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (data[r][c]) ctx.fillRect(x + c * m, y + r * m, m + 0.5, m + 0.5);
+}
+
+function target(ctx, x, y, r, color) {
+  ctx.save();
+  ctx.strokeStyle = ctx.fillStyle = color;
+  ctx.lineWidth = r * 0.13;
+  ctx.beginPath(); ctx.arc(x, y, r * 0.47, 0, 2 * Math.PI); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x, y + r); ctx.moveTo(x - r, y); ctx.lineTo(x + r, y); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, r * 0.17, 0, 2 * Math.PI); ctx.fill();
+  ctx.restore();
+}
+
+const font = (ctx, size, weight = 400, stretch = 'normal') => { ctx.font = `${weight} ${size}px Archivo, sans-serif`; ctx.fontStretch = stretch; };
+
+// Word-wraps runs of [text, weight] into width; returns the y after the last line.
+function paragraph(ctx, runs, x, y, width, size, color, lead = 1.38) {
+  const words = runs.flatMap(([t, w]) => t.split(/(?<=\s)/).map((word) => [word, w]));
+  let cx = x;
+  ctx.fillStyle = color;
+  ctx.textBaseline = 'alphabetic';
+  for (const [word, w] of words) {
+    font(ctx, size, w);
+    const ww = ctx.measureText(word.trimEnd()).width;
+    if (cx > x && cx + ww > x + width) { cx = x; y += size * lead; }
+    ctx.fillText(word, cx, y);
+    cx += ctx.measureText(word).width;
+  }
+  return y + size * lead;
+}
+
 async function makeSheet(id) {
-  const tpl = await loadTemplate(id);
+  const [tpl, { encode }] = await Promise.all([loadTemplate(id), import(UQR)]);
+  await Promise.all([400, 650, 800].map((w) => document.fonts.load(`${w} 40px Archivo`)));
   const { width: tw, height: th } = tpl;
-  const S = 2, M = 56 + MARK_R + 34, FOOT = 72;
+  const { W, H, m, s, ox, oy, x0, cw, barH, site } = sheetLayout(tw, th);
   const c = document.createElement('canvas');
-  c.width = (tw + 2 * M) * S; c.height = (th + 2 * M + FOOT) * S;
+  c.width = W; c.height = H;
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.fillRect(0, 0, W, H);
 
   const tplCanvas = new OffscreenCanvas(tw, th);
   tplCanvas.getContext('2d').putImageData(tpl, 0, 0);
 
   // Non-photo blue hatching over everything the car never shows.
-  const hatch = new OffscreenCanvas(tw * S, th * S), h = hatch.getContext('2d');
-  h.strokeStyle = '#9fd6ef'; h.lineWidth = 1.6 * S;
-  for (let d = -th * S; d < tw * S; d += 11 * S) { h.beginPath(); h.moveTo(d, th * S); h.lineTo(d + th * S, 0); h.stroke(); }
+  const hw = Math.round(tw * s), hh = Math.round(th * s);
+  const hatch = new OffscreenCanvas(hw, hh), h = hatch.getContext('2d');
+  h.strokeStyle = C.npb; h.lineWidth = 0.3 * MM;
+  for (let d = -hh; d < hw; d += 1.9 * MM) { h.beginPath(); h.moveTo(d, hh); h.lineTo(d + hh, 0); h.stroke(); }
   h.globalCompositeOperation = 'destination-out';
-  h.drawImage(tplCanvas, 0, 0, tw * S, th * S);
+  h.drawImage(tplCanvas, 0, 0, hw, hh);
 
   const lines = new ImageData(tw, th);
   for (let i = 0; i < tw * th; i++) if (isTemplateLine(tpl.data, i)) lines.data[i * 4 + 3] = 255;
   const lineCanvas = new OffscreenCanvas(tw, th);
   lineCanvas.getContext('2d').putImageData(lines, 0, 0);
 
-  ctx.setTransform(S, 0, 0, S, M * S, M * S);
-  ctx.drawImage(hatch, 0, 0, tw, th);
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.drawImage(hatch, 0, 0, tw * s, th * s);
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(lineCanvas, 0, 0, tw, th);
-
+  ctx.drawImage(lineCanvas, 0, 0, tw * s, th * s);
+  ctx.scale(s, s);
   // Registration marks: alignment looks for these exact shapes.
   ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
   for (const [x, y] of markCentres(tw, th)) {
@@ -278,19 +325,84 @@ async function makeSheet(id) {
     ctx.beginPath(); ctx.moveTo(x - MARK_R * 1.6, y); ctx.lineTo(x + MARK_R * 1.6, y);
     ctx.moveTo(x, y - MARK_R * 1.6); ctx.lineTo(x, y + MARK_R * 1.6); ctx.stroke();
   }
+  const q = qrSpot(tpl);
+  if (q) drawQR(ctx, encode, QR_PREFIX + id.toUpperCase(), q.x, q.y, q.size, 'Q');
+  ctx.restore();
 
-  await document.fonts.load('600 26px Archivo');
-  ctx.fillStyle = '#4e4b55';
-  ctx.font = '600 26px Archivo, sans-serif';
-  ctx.textBaseline = 'alphabetic';
-  const y = th + M + 30;
-  ctx.textAlign = 'left';
-  ctx.fillText(label(id).toUpperCase(), 0, y);
+  // Instructions column.
+  ctx.fillStyle = C.rule;
+  ctx.fillRect(x0 - 6 * MM, m + 4 * MM, 0.25 * MM, H - 2 * m - 8 * MM);
+
+  let y = m + 4 * MM;
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  const tr = 4.6 * MM, tx = x0 + tr, ty = y + 5.2 * MM;
+  target(ctx, tx - 0.9 * MM, ty + 0.55 * MM, tr, C.cyan);
+  target(ctx, tx + 0.9 * MM, ty - 0.4 * MM, tr, C.magenta);
+  target(ctx, tx + 0.2 * MM, ty + 0.9 * MM, tr, C.yellow);
+  ctx.restore();
+  const ws = 9.4 * MM;
+  font(ctx, ws, 800, 'semi-expanded');
+  ctx.fillStyle = C.ink;
+  ctx.fillText('Crayon', x0 + 2 * tr + 3 * MM, y + 0.78 * ws);
+  ctx.fillText('to Car', x0 + 2 * tr + 3 * MM, y + 1.7 * ws);
+  y += 2 * ws + 5 * MM;
+
+  y = paragraph(ctx, [['Colour in the car, then turn the drawing into a wrap for a real Tesla.', 400]], x0, y, cw, 4.3 * MM, C.ink2, 1.32);
+  y += 4 * MM;
+
+  const steps = [
+    [C.cyan, '#fff', 'Colour it in. ', 'Anything goes. Skip the blue stripes: they don’t show on the car.'],
+    [C.magenta, '#fff', 'Take a photo ', 'of the whole page, flat and in good light.'],
+    [C.yellow, C.ink, 'Scan the code ', 'below to open Crayon to Car, and add the photo.'],
+    [C.ink, '#fff', 'Download the wrap. ', 'In the Tesla app, go to Creations › Wrap › Upload. Or put it in a folder called Wraps on a USB stick.'],
+  ];
+  const ts = 3.55 * MM, dr = 2.7 * MM, indent = 2 * dr + 2.6 * MM;
+  steps.forEach(([bg, fg, lead, rest], i) => {
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.arc(x0 + dr, y - ts * 0.36, dr, 0, 2 * Math.PI); ctx.fill();
+    font(ctx, ts * 0.92, 800);
+    ctx.fillStyle = fg; ctx.textAlign = 'center';
+    ctx.fillText(String(i + 1), x0 + dr, y - ts * 0.36 + ts * 0.33);
+    ctx.textAlign = 'left';
+    y = paragraph(ctx, [[lead, 650], [rest, 400]], x0 + indent, y, cw - indent, ts, C.ink, 1.36) + 2.4 * MM;
+  });
+
+  // Website code, anchored to the bottom of the column, with a line to sign above it.
+  const { y: qy, size: qs } = site;
+  const sy = qy - 9 * MM;
+  font(ctx, 3.1 * MM, 650, 'condensed');
+  ctx.fillStyle = C.ink;
+  ctx.letterSpacing = `${0.3 * MM}px`;
+  ctx.fillText('DRAWN BY', x0, sy);
+  ctx.letterSpacing = '0px';
+  const sx = x0 + ctx.measureText('DRAWN BY').width + 4 * MM;
+  ctx.fillStyle = C.rule;
+  ctx.fillRect(sx, sy + 0.6 * MM, x0 + cw - sx, 0.3 * MM);
+  drawQR(ctx, encode, `${SITE}?car=${id}`, x0, qy, qs, 'M');
+  const lx = x0 + qs + 5 * MM, lw = cw - qs - 5 * MM;
+  font(ctx, 3.1 * MM, 650, 'condensed');
+  ctx.fillStyle = C.ink;
+  ctx.letterSpacing = `${0.3 * MM}px`;
+  ctx.fillText('SCAN TO START', lx, qy + 3 * MM);
+  ctx.letterSpacing = '0px';
+  let ly = paragraph(ctx, [['ewels.github.io/ tesla-wrap-drawings', 650]], lx, qy + 9 * MM, lw, 3.1 * MM, C.ink, 1.3);
+  paragraph(ctx, [['Free, and it runs in the browser. Photos stay on your phone.', 400]], lx, ly + 2 * MM, lw, 2.8 * MM, C.ink2, 1.35);
+
+  // Footer: car, sheet code, and the site's colour bar.
+  const fy = H - m - barH - 2.4 * MM;
+  font(ctx, 2.7 * MM, 650, 'condensed');
+  ctx.letterSpacing = `${0.25 * MM}px`;
+  ctx.fillStyle = C.ink;
+  ctx.fillText(label(id).toUpperCase(), x0, fy);
   ctx.textAlign = 'right';
-  const note = 'Blue hatched areas don’t show on the car';
-  ctx.fillText(note, tw, y);
-  ctx.fillStyle = '#9fd6ef';
-  ctx.fillRect(tw - ctx.measureText(note).width - 40, y - 21, 28, 24);
+  ctx.fillStyle = C.ink2;
+  ctx.fillText('NOT AFFILIATED WITH TESLA', W - m, fy);
+  ctx.textAlign = 'left';
+  ctx.letterSpacing = '0px';
+  const bar = [C.cyan, C.magenta, C.yellow, C.ink, '#80cff1', '#f17fbd', '#fff280', '#a2a1a4'];
+  bar.forEach((col, i) => { ctx.fillStyle = col; ctx.fillRect(x0 + (cw * i) / 8, H - m - barH, cw / 8 + 0.5, barH); });
+
   return new Promise((r) => c.toBlob(r, 'image/png'));
 }
 

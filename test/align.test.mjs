@@ -50,6 +50,16 @@ console.log(`score ${score.toFixed(3)}, max corner error ${err.toFixed(2)} px`);
 assert.ok(score > 0.8, 'outline fits');
 assert.ok(err < 1.5, 'registration within 1.5 px');
 
+// A sheet's QR code gives a rough seed; refinement must still land on the truth.
+const rough = A.homography([[0, 0], [TW, 0], [TW, TH], [0, TH]], [[882, 748], [251, 812], [311, 151], [829, 222]]);
+const seeded = A.align(prep, A.templateModel(tpl), rough);
+const seedErr = Math.max(...[[0, 0], [TW, 0], [TW, TH], [0, TH]].map(([x, y]) => {
+  const [a, b] = A.apply(seeded.H, x, y), [c, d] = A.apply(truth, x, y);
+  return Math.hypot(a - c, b - d);
+}));
+console.log(`seeded: score ${seeded.score.toFixed(3)}, max corner error ${seedErr.toFixed(2)} px`);
+assert.ok(seedErr < 1.5, 'seeded registration within 1.5 px');
+
 const wrap = A.renderWrap(A.warp(photo, H, TW, TH), tpl);
 for (let i = 3; i < wrap.data.length; i += 4) assert.equal(wrap.data[i], tpl.data[i], 'alpha matches template');
 console.log('ok');

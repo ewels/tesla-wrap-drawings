@@ -152,6 +152,40 @@ export function markCentres(tw, th) {
   return [[-o, -o], [tw + o, -o], [tw + o, th + o], [-o, th + o]];
 }
 
+// Printed sheets carry a small QR code naming the car, placed in the largest
+// empty (off-car) square of the template. Sheet and reader both derive the
+// spot from this function, so it must stay deterministic.
+export const QR_PREFIX = 'CTC1:', QR_MAX = 104, QR_MIN = 64, QR_PAD = 10;
+export function qrSpot(tpl) {
+  const { width: w, height: h, data } = tpl;
+  const s = new Uint16Array(w * h);
+  let best = 0, bx = 0, by = 0;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (data[i * 4 + 3] > 0) continue;
+      const v = x && y ? 1 + Math.min(s[i - 1], s[i - w], s[i - w - 1]) : 1;
+      s[i] = v;
+      // Largest square wins; ties go to the one nearest the middle.
+      const cx = x - v / 2 - w / 2, cy = y - v / 2 - h / 2;
+      if (v > best || (v === best && cx * cx + cy * cy < (bx - best / 2 - w / 2) ** 2 + (by - best / 2 - h / 2) ** 2)) { best = v; bx = x; by = y; }
+    }
+  const size = Math.min(QR_MAX, best - 2 * QR_PAD);
+  if (size < QR_MIN) return null;
+  return { x: bx - best / 2 - size / 2 + 1, y: by - best / 2 - size / 2 + 1, size };
+}
+
+// A4 landscape sheet at 300 dpi, in sheet px. The worker maps the website QR
+// back into template space with this, so the sheet must be drawn from it too.
+export const MM = 300 / 25.4;
+export function sheetLayout(tw, th) {
+  const W = Math.round(297 * MM), H = Math.round(210 * MM), m = 7 * MM;
+  const E = MARK_OFFSET + MARK_R * 1.6, box = H - 2 * m;
+  const s = Math.min(box / (tw + 2 * E), box / (th + 2 * E));
+  const x0 = m + (tw + 2 * E) * s + 12 * MM, barH = 2.4 * MM, qs = 34 * MM;
+  return { W, H, m, s, ox: m + E * s, oy: (H - th * s) / 2, x0, cw: W - m - x0, barH, site: { x: x0, y: H - m - barH - 7 * MM - qs, size: qs } };
+}
+
 function markPoints(tw, th) {
   const pts = [];
   for (const [cx, cy] of markCentres(tw, th)) {
@@ -323,9 +357,14 @@ export function prepare(img) {
   return { width: img.width, height: img.height, D: distanceTransform(lines, img.width, img.height), paper: findPaper(img) };
 }
 
-// Template px → photo px (in prepared image coordinates).
-export function align(prep, model) {
+// Template px → photo px (in prepared image coordinates). A seed homography
+// (from the sheet's QR code) skips the search when it refines to a good fit.
+export function align(prep, model, seed) {
   const { D, width: w, height: h, paper } = prep;
+  if (seed) {
+    const H = refine(D, w, h, seed, model.fine, model.width, model.height, [48, 24, 12, 6, 3, 2]);
+    if (inlierRatio(D, w, h, H, model.fine) > 0.6) return withMarks(prep, model, H);
+  }
   const frames = [{ H: [1, 0, 0, 0, 1, 0, 0, 0, 1], W: w, Hh: h, angles: [-0.1, -0.05, 0, 0.05, 0.1] }];
   if (paper) {
     const [a, b, c, d] = paper;
@@ -344,7 +383,10 @@ export function align(prep, model) {
     if (score > best.score) best = { H, score };
     if (best.score > 0.8) break;
   }
-  let { H } = best;
+  return withMarks(prep, model, best.H);
+}
+
+function withMarks({ D, width: w, height: h }, model, H) {
   // Printed sheets from this app carry registration marks; fold them in
   // only when they're actually there, so stray edges can't pull a plain print.
   const hasMarks = inlierRatio(D, w, h, H, model.marks, 3) > 0.6;
