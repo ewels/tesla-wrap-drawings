@@ -278,6 +278,54 @@ function drawMark(ctx, { x, y, r }, bits) {
   ctx.restore();
 }
 
+// Car name beside the roof mark (below, or above if that's roomier), shrunk or
+// wrapped to stay clear of the car's panels.
+function drawChip(ctx, tpl, { x, y, r }, text, size) {
+  const { width: tw, height: th, data } = tpl;
+  const mono = (px) => { ctx.font = `600 ${px}px ui-monospace, 'SF Mono', Menlo, Consolas, monospace`; ctx.letterSpacing = `${px * 0.08}px`; };
+  const free = (xx, yy) => yy >= 0 && yy < th && data[(Math.round(yy) * tw + Math.round(xx)) * 4 + 3] === 0;
+  // Usable width for a chip spanning rows top..top+h, centred on the mark.
+  const room = (top, h) => {
+    let half = tw / 2;
+    for (let yy = Math.floor(top); yy <= top + h; yy++) {
+      let l = 0, rr = 0;
+      while (x - l > 0 && free(x - l, yy)) l++;
+      while (x + rr < tw - 1 && free(x + rr, yy)) rr++;
+      half = Math.min(half, l, rr);
+    }
+    return 2 * half - size;
+  };
+  const gap = (MARK.tickOut + 0.25) * r;
+  const split = text.indexOf(' (');
+  const layouts = [[text]];
+  if (split > 0) layouts.push([text.slice(0, split), text.slice(split + 1)]);
+  let best = { scale: -1 };
+  for (const lines of layouts)
+    for (const below of [true, false]) {
+      mono(size);
+      const wide = Math.max(...lines.map((l) => ctx.measureText(l).width)) + size * 1.1;
+      const h = size * (0.5 + 1.25 * lines.length);
+      const top = below ? y + gap : y - gap - h;
+      // Prefer one line below the mark; wrap or move up only when it buys real size.
+      const scale = Math.min(1, room(top, h) / wide) - (lines.length - 1) * 0.08 - (below ? 0 : 0.04);
+      if (scale > best.scale) best = { scale, lines, below };
+    }
+  const px = size * Math.max(0.55, Math.min(1, best.scale + (best.lines.length - 1) * 0.08 + (best.below ? 0 : 0.04)));
+  mono(px);
+  const { lines } = best;
+  const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + px * 1.1, h = px * (0.5 + 1.25 * lines.length);
+  const top = best.below ? y + gap : y - gap - h;
+  ctx.fillStyle = C.ink;
+  ctx.beginPath(); ctx.roundRect(x - w / 2, top, w, h, px * 0.3); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => ctx.fillText(l, x + px * 0.04, top + px * (0.25 + 1.25 * i + 0.66)));
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.letterSpacing = '0px';
+}
+
 function target(ctx, x, y, r, color) {
   ctx.save();
   ctx.strokeStyle = ctx.fillStyle = color;
@@ -366,7 +414,9 @@ async function makeSheet(id) {
     ctx.beginPath(); ctx.moveTo(x - MARK_R * 1.6, y); ctx.lineTo(x + MARK_R * 1.6, y);
     ctx.moveTo(x, y - MARK_R * 1.6); ctx.lineTo(x, y + MARK_R * 1.6); ctx.stroke();
   }
-  drawMark(ctx, roofSpot(tpl), markBits(codeOf(id)));
+  const spot = roofSpot(tpl);
+  drawMark(ctx, spot, markBits(codeOf(id)));
+  drawChip(ctx, tpl, spot, label(id).toUpperCase(), (2.3 * MM) / s);
   ctx.restore();
 
   // Instructions column.
