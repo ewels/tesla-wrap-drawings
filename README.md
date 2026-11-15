@@ -29,6 +29,8 @@ Everything runs in the browser. Photos never leave the device.
   </tr>
 </table>
 
+<p align="center"><img src="docs/sheet-model-y.png" alt="The Model Y colouring sheet: A4 landscape, the template on the left with off-car areas hatched in blue and a small QR code in the glass roof, and instructions with a QR code to the site on the right" width="800"><br><sub>The Model Y colouring sheet (A4 landscape)</sub></p>
+
 ## How the alignment works
 
 - Thin, dark, colourless strokes (the printed outline) are picked out with a black-hat filter, so marker fills and coloured scribbles are ignored.

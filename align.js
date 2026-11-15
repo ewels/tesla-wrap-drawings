@@ -144,12 +144,13 @@ function sampleD(D, w, h, x, y) {
 
 export const isTemplateLine = (data, i) => data[i * 4 + 3] > 128 && data[i * 4] + data[i * 4 + 1] + data[i * 4 + 2] < 384;
 
-// Registration marks on printed sheets sit this far outside the template frame.
-export const MARK_OFFSET = 56, MARK_R = 22;
+// Registration marks sit just left and right of the template, level with its
+// top and bottom edges, so they cost the drawing no height on the page.
+export const MARK_OFFSET = 30, MARK_R = 16;
 
 export function markCentres(tw, th) {
-  const o = MARK_OFFSET;
-  return [[-o, -o], [tw + o, -o], [tw + o, th + o], [-o, th + o]];
+  const o = MARK_OFFSET, a = MARK_R * 1.6;
+  return [[-o, a], [tw + o, a], [tw + o, th - a], [-o, th - a]];
 }
 
 // Printed sheets carry a small QR code naming the car, placed in the largest
@@ -181,9 +182,9 @@ export const MM = 300 / 25.4;
 export function sheetLayout(tw, th) {
   const W = Math.round(297 * MM), H = Math.round(210 * MM), m = 7 * MM;
   const E = MARK_OFFSET + MARK_R * 1.6, box = H - 2 * m;
-  const s = Math.min(box / (tw + 2 * E), box / (th + 2 * E));
-  const x0 = m + (tw + 2 * E) * s + 12 * MM, barH = 2.4 * MM, qs = 34 * MM;
-  return { W, H, m, s, ox: m + E * s, oy: (H - th * s) / 2, x0, cw: W - m - x0, barH, site: { x: x0, y: H - m - barH - 7 * MM - qs, size: qs } };
+  const s = box / Math.max(tw, th);
+  const x0 = m + (tw + 2 * E) * s + 9 * MM, barH = 2.4 * MM, qs = 30 * MM;
+  return { W, H, m, s, ox: m + E * s, oy: (H - th * s) / 2, x0, cw: W - m - x0, barH, site: { x: x0, y: H - m - barH - 15 * MM - qs, size: qs } };
 }
 
 function markPoints(tw, th) {

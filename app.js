@@ -331,7 +331,7 @@ async function makeSheet(id) {
 
   // Instructions column.
   ctx.fillStyle = C.rule;
-  ctx.fillRect(x0 - 6 * MM, m + 4 * MM, 0.25 * MM, H - 2 * m - 8 * MM);
+  ctx.fillRect(x0 - 4.5 * MM, m + 4 * MM, 0.25 * MM, H - 2 * m - 8 * MM);
 
   let y = m + 4 * MM;
   ctx.save();
@@ -348,14 +348,14 @@ async function makeSheet(id) {
   ctx.fillText('to Car', x0 + 2 * tr + 3 * MM, y + 1.7 * ws);
   y += 2 * ws + 5 * MM;
 
-  y = paragraph(ctx, [['Colour in the car, then turn the drawing into a wrap for a real Tesla.', 400]], x0, y, cw, 4.3 * MM, C.ink2, 1.32);
+  y = paragraph(ctx, [['Colour in the car, then make it a wrap for a real Tesla.', 400]], x0, y, cw, 4.3 * MM, C.ink2, 1.32);
   y += 4 * MM;
 
   const steps = [
     [C.cyan, '#fff', 'Colour it in. ', 'Anything goes. Skip the blue stripes: they don’t show on the car.'],
     [C.magenta, '#fff', 'Take a photo ', 'of the whole page, flat and in good light.'],
-    [C.yellow, C.ink, 'Scan the code ', 'below to open Crayon to Car, and add the photo.'],
-    [C.ink, '#fff', 'Download the wrap. ', 'In the Tesla app, go to Creations › Wrap › Upload. Or put it in a folder called Wraps on a USB stick.'],
+    [C.yellow, C.ink, 'Scan the code ', 'below and add your photo.'],
+    [C.ink, '#fff', 'Download the wrap. ', 'Upload it in the Tesla app under Creations › Wrap, or copy it to a Wraps folder on a USB stick.'],
   ];
   const ts = 3.55 * MM, dr = 2.7 * MM, indent = 2 * dr + 2.6 * MM;
   steps.forEach(([bg, fg, lead, rest], i) => {
@@ -368,26 +368,25 @@ async function makeSheet(id) {
     y = paragraph(ctx, [[lead, 650], [rest, 400]], x0 + indent, y, cw - indent, ts, C.ink, 1.36) + 2.4 * MM;
   });
 
-  // Website code, anchored to the bottom of the column, with a line to sign above it.
+  // Website code near the bottom, with a line to sign above it.
   const { y: qy, size: qs } = site;
-  const sy = qy - 9 * MM;
-  font(ctx, 3.1 * MM, 650, 'condensed');
-  ctx.fillStyle = C.ink;
-  ctx.letterSpacing = `${0.3 * MM}px`;
-  ctx.fillText('DRAWN BY', x0, sy);
-  ctx.letterSpacing = '0px';
-  const sx = x0 + ctx.measureText('DRAWN BY').width + 4 * MM;
+  const caps = (text, x, y) => {
+    font(ctx, 3.1 * MM, 650, 'condensed');
+    ctx.fillStyle = C.ink;
+    ctx.letterSpacing = `${0.3 * MM}px`;
+    ctx.fillText(text, x, y);
+    const w = ctx.measureText(text).width;
+    ctx.letterSpacing = '0px';
+    return w;
+  };
+  const sy = qy - 15 * MM;
+  const sx = x0 + caps('DRAWN BY', x0, sy) + 4 * MM;
   ctx.fillStyle = C.rule;
   ctx.fillRect(sx, sy + 0.6 * MM, x0 + cw - sx, 0.3 * MM);
+  caps('SCAN TO START', x0, qy - 3.6 * MM);
   drawQR(ctx, encode, `${SITE}?car=${id}`, x0, qy, qs, 'M');
-  const lx = x0 + qs + 5 * MM, lw = cw - qs - 5 * MM;
-  font(ctx, 3.1 * MM, 650, 'condensed');
-  ctx.fillStyle = C.ink;
-  ctx.letterSpacing = `${0.3 * MM}px`;
-  ctx.fillText('SCAN TO START', lx, qy + 3 * MM);
-  ctx.letterSpacing = '0px';
-  let ly = paragraph(ctx, [['ewels.github.io/ tesla-wrap-drawings', 650]], lx, qy + 9 * MM, lw, 3.1 * MM, C.ink, 1.3);
-  paragraph(ctx, [['Free, and it runs in the browser. Photos stay on your phone.', 400]], lx, ly + 2 * MM, lw, 2.8 * MM, C.ink2, 1.35);
+  paragraph(ctx, [['Free, and it runs in the browser. Photos stay on your phone.', 400]], x0 + qs + 4 * MM, qy + 2.6 * MM, cw - qs - 4 * MM, 2.8 * MM, C.ink2, 1.35);
+  paragraph(ctx, [['ewels.github.io/tesla-wrap-drawings', 650]], x0, qy + qs + 5.2 * MM, cw, 3.1 * MM, C.ink, 1.3);
 
   // Footer: car, sheet code, and the site's colour bar.
   const fy = H - m - barH - 2.4 * MM;
