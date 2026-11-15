@@ -19,7 +19,7 @@ Everything runs in the browser. Photos never leave the device.
 - **Automatic alignment.** Works out which car the drawing is for, and copes with rotated, tilted and shadowed photos.
 - **Tesla-ready PNG.** Keeps the template's transparency exactly, removes the printed outlines and stays under Tesla's 1 MB limit.
 - **3D preview.** See the drawing on the car before you send it.
-- **Better colouring sheets.** A4 landscape, with the parts that never show on the car hatched out and the instructions printed alongside, so anyone can pick one up and use it. Two QR codes on each sheet tell the app which car it is and where the drawing sits, so the photo lines up first time.
+- **Better colouring sheets.** A4 landscape, with the parts that never show on the car hatched out and the instructions printed alongside, so anyone can pick one up and use it. A printed mark in the glass roof tells the app which car it is and where the drawing sits, so the photo lines up first time.
 - **Installs on your phone.** Add it to the home screen and it works like an app, offline too.
 
 <p align="center"><img src="docs/sheet-model-y.png" alt="The Model Y colouring sheet: A4 landscape, the template on the left with off-car areas hatched in blue and a small QR code in the glass roof, and instructions with a QR code to the site on the right" width="800"><br><sub>The Model Y colouring sheet (A4 landscape)</sub></p>
@@ -41,7 +41,7 @@ The car models in `cars/` are Tesla's in-app visualiser models, converted to Dra
 
 Static files with no build step. Serve the folder (`python3 -m http.server`) and open it. HEIC photos decode natively in Safari; other browsers load [heic-to](https://github.com/hoppergee/heic-to) from jsDelivr on demand.
 
-Test: `node test/align.test.mjs`
+Test: `node test/align.test.mjs && node test/mark.test.mjs`
 
 Deploy: enable GitHub Pages from the `main` branch root.
 

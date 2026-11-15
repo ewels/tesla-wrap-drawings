@@ -1,5 +1,5 @@
-import { MODELS, label, loadTemplate } from './models.js';
-import { isTemplateLine, markCentres, qrSpot, sheetLayout, MM, MARK_R, QR_PREFIX } from './align.js';
+import { MODELS, label, loadTemplate, codeOf } from './models.js';
+import { isTemplateLine, markCentres, roofSpot, markBits, sheetLayout, MM, MARK, MARK_R } from './align.js';
 
 const $ = (id) => document.getElementById(id);
 const sheet = $('sheet'), view = $('view'), modelSelect = $('model'), printSelect = $('print-model');
@@ -155,7 +155,7 @@ async function show(data) {
   const file = new File([blob.blob], fileName(), { type: 'image/png' });
   $('share').hidden = !navigator.canShare?.({ files: [file] });
   const kb = Math.round(blob.blob.size / 1000), pct = Math.round(data.score * 100);
-  $('meta').textContent = `${blob.width} × ${blob.height} px · ${kb} KB${blob.posterized ? ' · colours simplified to fit 1 MB' : ''}${data.fromCode ? ' · sheet code read' : ''}${data.hasMarks ? ' · registration marks found' : ''}`;
+  $('meta').textContent = `${blob.width} × ${blob.height} px · ${kb} KB${blob.posterized ? ' · colours simplified to fit 1 MB' : ''}${data.fromCode ? ' · sheet recognised' : ''}${data.hasMarks ? ' · registration marks found' : ''}`;
   $('slug').innerHTML = `<span>${label(data.id)}</span><span>Outline matched ${pct}%</span><span>${blob.width}×${blob.height} · ${kb} KB</span>`;
 }
 
@@ -257,6 +257,27 @@ function drawQR(ctx, encode, text, x, y, size, ecc) {
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (data[r][c]) ctx.fillRect(x + c * m, y + r * m, m + 0.5, m + 0.5);
 }
 
+// Mirrors markInk in align.js, which the reader is tested against.
+function drawMark(ctx, { x, y, r }, bits) {
+  const n = MARK.segments, top = -Math.PI / 2;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(0, 0, MARK.clear * r, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = '#000';
+  bits.forEach((bit, i) => {
+    if (!bit) return;
+    const a0 = top + (i / n) * 2 * Math.PI, a1 = top + ((i + 1) / n) * 2 * Math.PI;
+    ctx.beginPath(); ctx.arc(0, 0, MARK.dataOut * r, a0, a1); ctx.arc(0, 0, MARK.dataIn * r, a1, a0, true); ctx.fill();
+  });
+  ctx.beginPath(); ctx.arc(0, 0, MARK.ringOut * r, 0, 2 * Math.PI); ctx.arc(0, 0, MARK.ringIn * r, 0, 2 * Math.PI, true); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, MARK.dot * r, 0, 2 * Math.PI); ctx.fill();
+  const t = 0.035 * r;
+  for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]])
+    ctx.fillRect(dx ? Math.min(dx * MARK.tickIn, dx * MARK.tickOut) * r : -t, dy ? Math.min(dy * MARK.tickIn, dy * MARK.tickOut) * r : -t, dx ? (MARK.tickOut - MARK.tickIn) * r : 2 * t, dy ? (MARK.tickOut - MARK.tickIn) * r : 2 * t);
+  ctx.restore();
+}
+
 function target(ctx, x, y, r, color) {
   ctx.save();
   ctx.strokeStyle = ctx.fillStyle = color;
@@ -345,8 +366,7 @@ async function makeSheet(id) {
     ctx.beginPath(); ctx.moveTo(x - MARK_R * 1.6, y); ctx.lineTo(x + MARK_R * 1.6, y);
     ctx.moveTo(x, y - MARK_R * 1.6); ctx.lineTo(x, y + MARK_R * 1.6); ctx.stroke();
   }
-  const q = qrSpot(tpl);
-  if (q) drawQR(ctx, encode, QR_PREFIX + id.toUpperCase(), q.x, q.y, q.size, 'Q');
+  drawMark(ctx, roofSpot(tpl), markBits(codeOf(id)));
   ctx.restore();
 
   // Instructions column.

@@ -1,5 +1,5 @@
 import * as A from './align.js';
-import { MODELS, loadTemplate } from './models.js';
+import { MODELS, byCode, loadTemplate } from './models.js';
 
 const WORK = 1200, FULL = 4096, CODE = 2400;
 const JSQR = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/+esm';
@@ -16,11 +16,17 @@ function draw(bitmap, max) {
 
 const say = (text) => postMessage({ type: 'progress', text });
 
-// Printed sheets carry two QR codes: a small one in the drawing ("CTC1:<car>")
-// and the website link ("…?car=<car>"). Either names the car, and its corners
-// in template space seed the alignment. With two codes in view the decoder can
-// mix up their finder patterns, so overlapping tiles are tried after the whole frame.
-async function readCode(img) {
+// Printed sheets name their car twice: the roof mark (always in shot) and the
+// website QR's ?car= link (often cropped off). Either also pins down where the
+// template sits, which seeds the alignment. Results are in `img` pixels, as
+// template → photo point pairs.
+async function readSheet(img, tplFor) {
+  const mark = A.findMark(img);
+  const markId = mark && byCode(mark.code);
+  if (markId) {
+    const { x, y, r } = A.roofSpot(await tplFor(markId));
+    return { id: markId, src: mark.pairs.map(([[u, v]]) => [x + u * r, y + v * r]), dst: mark.pairs.map(([, p]) => p) };
+  }
   const jsQR = (await import(JSQR)).default;
   const { width: w, height: h } = img;
   const t = Math.round(Math.max(w, h) * 0.45), step = Math.round(t / 2);
@@ -30,32 +36,25 @@ async function readCode(img) {
     const data = new Uint8ClampedArray(rw * rh * 4);
     for (let r = 0; r < rh; r++) data.set(img.data.subarray(((y + r) * w + x) * 4, ((y + r) * w + x + rw) * 4), r * rw * 4);
     const code = jsQR(data, rw, rh, { inversionAttempts: 'dontInvert' });
-    if (!code) continue;
-    const small = code.data.startsWith(A.QR_PREFIX) && code.data.slice(A.QR_PREFIX.length).toLowerCase();
-    const id = small || code.data.match(/[?&]car=([\w-]+)/)?.[1];
+    const id = code?.data.match(/[?&]car=([\w-]+)/)?.[1];
     if (!id || !MODELS.some(([m]) => m === id)) continue;
-    const L = code.location;
-    const corners = [L.topLeftCorner, L.topRightCorner, L.bottomRightCorner, L.bottomLeftCorner].map((p) => [p.x + x, p.y + y]);
-    return { id, corners, small: !!small };
+    const tpl = await tplFor(id), L = A.sheetLayout(tpl.width, tpl.height);
+    const q = { x: (L.site.x - L.ox) / L.s, y: (L.site.y - L.oy) / L.s, size: L.site.size / L.s };
+    const loc = code.location;
+    return {
+      id,
+      src: [[q.x, q.y], [q.x + q.size, q.y], [q.x + q.size, q.y + q.size], [q.x, q.y + q.size]],
+      dst: [loc.topLeftCorner, loc.topRightCorner, loc.bottomRightCorner, loc.bottomLeftCorner].map((p) => [p.x + x, p.y + y]),
+    };
   }
   return null;
-}
-
-function codeSquare(tpl, small) {
-  if (small) return A.qrSpot(tpl);
-  const L = A.sheetLayout(tpl.width, tpl.height);
-  return { x: (L.site.x - L.ox) / L.s, y: (L.site.y - L.oy) / L.s, size: L.site.size / L.s };
 }
 
 async function fit(id) {
   const tpl = await loadTemplate(id);
   const model = (fit.models ??= new Map()).get(id) ?? A.templateModel(tpl);
   fit.models.set(id, model);
-  let seed;
-  if (photo.code?.id === id) {
-    const q = codeSquare(tpl, photo.code.small);
-    if (q) seed = A.homography([[q.x, q.y], [q.x + q.size, q.y], [q.x + q.size, q.y + q.size], [q.x, q.y + q.size]], photo.code.corners);
-  }
+  const seed = photo.sheet?.id === id ? A.homography(photo.sheet.src, photo.sheet.dst) : null;
   return { id, tpl, fromCode: !!seed, ...A.align(photo.prep, model, seed) };
 }
 
@@ -67,9 +66,9 @@ async function run({ bitmap, prefer, force }) {
     bitmap.close();
     photo.prep = A.prepare(photo.work);
     say('Reading the sheet');
-    const code = await readCode(mid).catch(() => null);
+    const sheet = await readSheet(mid, loadTemplate).catch(() => null);
     const k = photo.work.width / mid.width;
-    photo.code = code && { id: code.id, small: code.small, corners: code.corners.map(([x, y]) => [x * k, y * k]) };
+    photo.sheet = sheet && { id: sheet.id, src: sheet.src, dst: sheet.dst.map(([x, y]) => [x * k, y * k]) };
   }
   let best;
   if (force) {
@@ -77,7 +76,7 @@ async function run({ bitmap, prefer, force }) {
     best = await fit(force);
   } else {
     // Try the car used last time first; only search the rest if it doesn't fit.
-    const order = [...new Set([photo.code?.id, prefer, ...MODELS.map(([id]) => id)].filter(Boolean))];
+    const order = [...new Set([photo.sheet?.id, prefer, ...MODELS.map(([id]) => id)].filter(Boolean))];
     for (const id of order) {
       say(best ? 'Trying other cars' : 'Lining up the template');
       const r = await fit(id).catch(() => null);

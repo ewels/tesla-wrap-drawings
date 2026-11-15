@@ -153,27 +153,171 @@ export function markCentres(tw, th) {
   return [[-o, a], [tw + o, a], [tw + o, th - a], [-o, th - a]];
 }
 
-// Printed sheets carry a small QR code naming the car, placed in the largest
-// empty (off-car) square of the template. Sheet and reader both derive the
-// spot from this function, so it must stay deterministic.
-export const QR_PREFIX = 'CTC1:', QR_MAX = 104, QR_MIN = 64, QR_PAD = 10;
-export function qrSpot(tpl) {
+// ---------- sheet mark ----------
+// Printed sheets carry a round "press mark" in the glass roof: a registration
+// target (dot + ring) inside a ring of 20 inked or blank segments. Reading
+// clockwise from the top: a 1110 start pattern, the car's 8-bit code, then a
+// CRC-8 of it. Black only, so it survives a black and white printer.
+// Sizes are fractions of the mark radius R.
+export const MARK = { dot: 0.17, ringIn: 0.36, ringOut: 0.48, dataIn: 0.6, dataOut: 0.92, tickIn: 1.04, tickOut: 1.34, clear: 1.0, segments: 20 };
+const SYNC = [1, 1, 1, 0];
+
+function crc8(v) {
+  let c = v;
+  for (let i = 0; i < 8; i++) c = c & 0x80 ? ((c << 1) ^ 0x07) & 0xff : (c << 1) & 0xff;
+  return c;
+}
+
+export function markBits(code) {
+  const bits = [...SYNC];
+  for (let i = 7; i >= 0; i--) bits.push((code >> i) & 1);
+  const c = crc8(code);
+  for (let i = 7; i >= 0; i--) bits.push((c >> i) & 1);
+  return bits;
+}
+
+// Bits as read in any rotation → the code and how many segments it was turned.
+export function readBits(bits) {
+  const n = MARK.segments;
+  for (let k = 0; k < n; k++) {
+    const b = bits.map((_, i) => bits[(i + k) % n]);
+    if (SYNC.some((v, i) => b[i] !== v)) continue;
+    let code = 0, c = 0;
+    for (let i = 0; i < 8; i++) { code = (code << 1) | b[4 + i]; c = (c << 1) | b[12 + i]; }
+    if (code && crc8(code) === c) return { code, shift: k };
+  }
+  return null;
+}
+
+// Is (u, v) inked, in units of R from the mark centre (y down, angle clockwise from the top)?
+export function markInk(u, v, bits) {
+  const r = Math.hypot(u, v), M = MARK;
+  if (r <= M.dot || (r >= M.ringIn && r <= M.ringOut)) return true;
+  if (r >= M.dataIn && r <= M.dataOut) {
+    const a = (Math.atan2(u, -v) / (2 * Math.PI) + 1) % 1;
+    return bits[Math.floor(a * M.segments)] === 1;
+  }
+  const t = 0.035;
+  return r >= M.tickIn && r <= M.tickOut && (Math.abs(u) < t || Math.abs(v) < t);
+}
+
+// The mark sits in the glass roof: the roomiest off-car spot near the template's centreline.
+export function roofSpot(tpl) {
   const { width: w, height: h, data } = tpl;
-  const s = new Uint16Array(w * h);
-  let best = 0, bx = 0, by = 0;
+  const solid = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) solid[i] = data[i * 4 + 3] > 0;
+  const D = distanceTransform(solid, w, h);
+  let best = 0, bx = w / 2, by = h / 2;
+  for (let y = Math.round(h * 0.15); y < h * 0.85; y++)
+    for (let x = Math.round(w * 0.3); x < w * 0.7; x++) {
+      // Prefer the centreline: the roof is symmetric about it.
+      const d = D[y * w + x] - Math.abs(x - w / 2) * 0.25;
+      if (d > best) { best = d; bx = x; by = y; }
+    }
+  return { x: bx, y: by, r: Math.min(56, (D[by * w + bx] - 4) / MARK.tickOut) };
+}
+
+// Finds and reads a sheet mark in a photo. Returns the car code and four
+// template-to-photo point pairs (in units of R around the mark) for seeding.
+export function findMark(img) {
+  const { width: w, height: h, data } = img;
+  // Brightest channel as grey: crayon of any colour reads as paper, ink stays dark.
+  const g = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) g[i] = Math.max(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
+  const I = new Float64Array((w + 1) * (h + 1));
+  for (let y = 0; y < h; y++) {
+    let row = 0;
+    for (let x = 0; x < w; x++) { row += g[y * w + x]; I[(y + 1) * (w + 1) + x + 1] = I[y * (w + 1) + x + 1] + row; }
+  }
+  const rad = Math.max(8, Math.round(Math.max(w, h) / 40));
+  const dark = new Uint8Array(w * h);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
-      const i = y * w + x;
-      if (data[i * 4 + 3] > 0) continue;
-      const v = x && y ? 1 + Math.min(s[i - 1], s[i - w], s[i - w - 1]) : 1;
-      s[i] = v;
-      // Largest square wins; ties go to the one nearest the middle.
-      const cx = x - v / 2 - w / 2, cy = y - v / 2 - h / 2;
-      if (v > best || (v === best && cx * cx + cy * cy < (bx - best / 2 - w / 2) ** 2 + (by - best / 2 - h / 2) ** 2)) { best = v; bx = x; by = y; }
+      const x0 = Math.max(0, x - rad), x1 = Math.min(w, x + rad + 1), y0 = Math.max(0, y - rad), y1 = Math.min(h, y + rad + 1);
+      const mean = (I[y1 * (w + 1) + x1] - I[y0 * (w + 1) + x1] - I[y1 * (w + 1) + x0] + I[y0 * (w + 1) + x0]) / ((x1 - x0) * (y1 - y0));
+      const v = g[y * w + x];
+      dark[y * w + x] = v < mean * 0.7 && v < 150 ? 1 : 0;
     }
-  const size = Math.min(QR_MAX, best - 2 * QR_PAD);
-  if (size < QR_MIN) return null;
-  return { x: bx - best / 2 - size / 2 + 1, y: by - best / 2 - size / 2 + 1, size };
+
+  // Connected components with moments.
+  const label = new Int32Array(w * h).fill(-1);
+  const comps = [];
+  const stack = [];
+  for (let start = 0; start < w * h; start++) {
+    if (!dark[start] || label[start] >= 0) continue;
+    const c = { n: 0, sx: 0, sy: 0, sxx: 0, syy: 0, sxy: 0, x0: w, x1: 0, y0: h, y1: 0 };
+    label[start] = comps.length;
+    stack.push(start);
+    while (stack.length) {
+      const i = stack.pop(), x = i % w, y = (i - x) / w;
+      c.n++; c.sx += x; c.sy += y; c.sxx += x * x; c.syy += y * y; c.sxy += x * y;
+      if (x < c.x0) c.x0 = x; if (x > c.x1) c.x1 = x; if (y < c.y0) c.y0 = y; if (y > c.y1) c.y1 = y;
+      for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1])
+        if (j >= 0 && dark[j] && label[j] < 0) { label[j] = comps.length; stack.push(j); }
+    }
+    comps.push(c);
+  }
+  const M = MARK;
+  const stats = comps.filter((c) => c.n >= 20).map((c) => {
+    const mx = c.sx / c.n, my = c.sy / c.n, bw = c.x1 - c.x0 + 1, bh = c.y1 - c.y0 + 1;
+    return { ...c, mx, my, bw, bh, size: Math.max(bw, bh), fill: c.n / (bw * bh), cxx: c.sxx / c.n - mx * mx, cyy: c.syy / c.n - my * my, cxy: c.sxy / c.n - mx * my };
+  });
+  const dots = stats.filter((c) => c.fill > 0.55 && Math.max(c.bw, c.bh) / Math.min(c.bw, c.bh) < 3);
+  const rings = stats.filter((c) => c.fill < 0.6 && c.size >= 15);
+  for (const ring of rings)
+    for (const dot of dots) {
+      const ratio = ring.size / dot.size;
+      if (ratio < (M.ringOut / M.dot) * 0.6 || ratio > (M.ringOut / M.dot) * 1.6) continue;
+      if (Math.hypot(ring.mx - dot.mx, ring.my - dot.my) > ring.size * 0.08) continue;
+      const read = readMark(ring, dark, w, h);
+      if (read) return read;
+    }
+  return null;
+}
+
+function readMark(ring, dark, w, h) {
+  const M = MARK;
+  // An annulus has covariance (ro² + ri²)/4 · I; the photo's affine A gives A·Aᵀ times that.
+  const k = (M.ringOut ** 2 + M.ringIn ** 2) / 4;
+  const a = ring.cxx / k, b = ring.cxy / k, d = ring.cyy / k;
+  const sq = Math.sqrt(a * d - b * b), t = Math.sqrt(a + d + 2 * sq);
+  if (!(t > 0)) return null;
+  const S = [(a + sq) / t, b / t, b / t, (d + sq) / t]; // symmetric root: R units → photo px, up to a rotation
+  const at = (u, v) => [ring.mx + S[0] * u + S[1] * v, ring.my + S[2] * u + S[3] * v];
+  const n = M.segments, per = 18, prof = new Float32Array(n * per);
+  for (let j = 0; j < n * per; j++) {
+    const ang = (j / (n * per)) * 2 * Math.PI;
+    let hit = 0, tot = 0;
+    for (const r of [0.68, 0.76, 0.84]) {
+      const [x, y] = at(r * Math.sin(ang), -r * Math.cos(ang));
+      const xi = Math.round(x), yi = Math.round(y);
+      if (xi < 0 || yi < 0 || xi >= w || yi >= h) return null;
+      hit += dark[yi * w + xi]; tot++;
+    }
+    prof[j] = hit / tot;
+  }
+  // Segment boundaries sit at an unknown phase: pick the one with the cleanest segments.
+  let best = { score: -1 };
+  for (let off = 0; off < per; off++) {
+    const vals = [];
+    for (let sgm = 0; sgm < n; sgm++) {
+      let sum = 0;
+      for (let q = 4; q < per - 4; q++) sum += prof[(off + sgm * per + q) % (n * per)];
+      vals.push(sum / (per - 8));
+    }
+    const score = vals.reduce((acc, v) => acc + Math.abs(v - 0.5), 0);
+    if (score > best.score) best = { score, off, vals };
+  }
+  if (best.vals.some((v) => Math.abs(v - 0.5) < 0.15)) return null;
+  const got = readBits(best.vals.map((v) => (v > 0.5 ? 1 : 0)));
+  if (!got) return null;
+  // Template segment 0 starts at the top; in the photo it starts at this angle.
+  const turn = ((best.off + got.shift * per) / (n * per)) * 2 * Math.PI;
+  const pairs = [0, 1, 2, 3].map((q) => {
+    const ang = (q * Math.PI) / 2, r = 0.76;
+    return [[r * Math.sin(ang), -r * Math.cos(ang)], at(r * Math.sin(ang + turn), -r * Math.cos(ang + turn))];
+  });
+  return { code: got.code, pairs };
 }
 
 // A4 landscape sheet at 300 dpi, in sheet px. The worker maps the website QR
