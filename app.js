@@ -315,9 +315,11 @@ function drawChip(ctx, tpl, { x, y, r }, text, size) {
   const { lines } = best;
   const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + px * 1.1, h = px * (0.5 + 1.25 * lines.length);
   const top = best.below ? y + gap : y - gap - h;
-  ctx.fillStyle = C.ink;
-  ctx.beginPath(); ctx.roundRect(x - w / 2, top, w, h, px * 0.3); ctx.fill();
   ctx.fillStyle = '#fff';
+  ctx.strokeStyle = C.ink;
+  ctx.lineWidth = px * 0.1;
+  ctx.beginPath(); ctx.roundRect(x - w / 2, top, w, h, px * 0.3); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = C.ink;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   lines.forEach((l, i) => ctx.fillText(l, x + px * 0.04, top + px * (0.25 + 1.25 * i + 0.66)));
